@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>User - Check Group</title>
+<style>
+  body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0f0f0;
+    margin: 0; padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 30px;
+  }
+  .container {
+    background: white;
+    max-width: 400px;
+    width: 100%;
+    border-radius: 8px;
+    padding: 25px 30px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  input, button {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    margin-top: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+  }
+  button {
+    background-color: #007acc;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #005fa3;
+  }
+  .message {
+    margin-top: 15px;
+    font-weight: 600;
+    color: #333;
+    white-space: pre-wrap;
+  }
+  .error {
+    color: #cc0000;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Check Your Group</h1>
+    <input id="nameInput" type="text" placeholder="Your name" autocomplete="off" />
+    <button id="checkGroupBtn">Check My Group</button>
+    <div id="message" class="message"></div>
+  </div>
+
+  <script>
+    const nameInput = document.getElementById('nameInput');
+    const checkGroupBtn = document.getElementById('checkGroupBtn');
+    const message = document.getElementById('message');
+
+    checkGroupBtn.addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      message.classList.remove('error');
+      message.textContent = '';
+
+      if (!name) {
+        message.classList.add('error');
+        message.textContent = 'Please enter your name.';
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/groups/' + encodeURIComponent(name));
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || 'Name not found');
+        }
+        const data = await res.json();
+        message.textContent = `Hi ${name}, you are in Group ${data.groupNumber}:\n${data.group.join(', ')}`;
+      } catch (err) {
+        message.classList.add('error');
+        message.textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>

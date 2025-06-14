@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin - Group Organizer</title>
+<style>
+  body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0f0f0;
+    margin: 0; padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 30px;
+  }
+  .container {
+    background: white;
+    max-width: 500px;
+    width: 100%;
+    border-radius: 8px;
+    padding: 25px 30px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-weight: 700;
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #007acc;
+    text-align: center;
+  }
+  label {
+    font-weight: 600;
+    margin-top: 10px;
+    display: block;
+    margin-bottom: 5px;
+    color: #333;
+  }
+  textarea, input[type="number"], input[type="text"], input[type="password"] {
+    width: 100%;
+    font-size: 14px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    resize: vertical;
+    font-family: inherit;
+  }
+  textarea {
+    height: 120px;
+  }
+  button {
+    margin-top: 20px;
+    width: 100%;
+    background-color: #007acc;
+    color: white;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background-color: #005fa3;
+  }
+  pre {
+    background: #e8e8e8;
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.4;
+    max-height: 250px;
+    overflow-y: auto;
+  }
+  .error {
+    color: #cc0000;
+    font-weight: 600;
+    margin-top: 10px;
+  }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container" id="login-container">
+  <h1>Admin Login</h1>
+  <label for="usernameInput">Username:</label>
+  <input id="usernameInput" type="text" autocomplete="off" />
+  <label for="passwordInput">Password:</label>
+  <input id="passwordInput" type="password" />
+  <button id="loginButton">Login</button>
+  <div id="loginError" class="error hidden"></div>
+</div>
+
+<div class="container hidden" id="admin-container">
+  <h1>Admin: Group Names Organizer</h1>
+
+  <label for="namesInput">Enter names (one per line):</label>
+  <textarea id="namesInput" placeholder="e.g.&#10;Alice&#10;Bob&#10;Charlie"></textarea>
+
+  <label for="groupSizeInput">Number of people per group:</label>
+  <input id="groupSizeInput" type="number" min="1" placeholder="e.g. 2" />
+
+  <button id="groupButton">Create Groups</button>
+
+  <div id="errorMessage" class="error hidden"></div>
+  <pre id="resultOutput" class="hidden"></pre>
+
+  <button id="logoutButton" style="margin-top: 15px; background: #cc0000;">Logout</button>
+</div>
+
+<script>
+  let token = null;
+
+  const loginContainer = document.getElementById('login-container');
+  const adminContainer = document.getElementById('admin-container');
+  const loginError = document.getElementById('loginError');
+
+  const usernameInput = document.getElementById('usernameInput');
+  const passwordInput = document.getElementById('passwordInput');
+  const loginButton = document.getElementById('loginButton');
+
+  const namesInput = document.getElementById('namesInput');
+  const groupSizeInput = document.getElementById('groupSizeInput');
+  const groupButton = document.getElementById('groupButton');
+  const errorMessage = document.getElementById('errorMessage');
+  const resultOutput = document.getElementById('resultOutput');
+  const logoutButton = document.getElementById('logoutButton');
+
+  function showError(element, msg) {
+    element.textContent = msg;
+    element.classList.remove('hidden');
+  }
+
+  function hideError(element) {
+    element.textContent = '';
+    element.classList.add('hidden');
+  }
+
+  function showResult(text) {
+    resultOutput.textContent = text;
+    resultOutput.classList.remove('hidden');
+  }
+
+  function hideResult() {
+    resultOutput.textContent = '';
+    resultOutput.classList.add('hidden');
+  }
+
+  loginButton.onclick = async () => {
+    hideError(loginError);
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!username || !password) {
+      showError(loginError, 'Please enter username and password');
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:3000/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ username, password })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Login failed');
+      }
+      const data = await res.json();
+      token = data.token;
+      loginContainer.classList.add('hidden');
+      adminContainer.classList.remove('hidden');
+      loadGroups();
+    } catch (err) {
+      showError(loginError, err.message);
+    }
+  };
+
+  logoutButton.onclick = () => {
+    token = null;
+    adminContainer.classList.add('hidden');
+    loginContainer.classList.remove('hidden');
+    usernameInput.value = '';
+    passwordInput.value = '';
+    namesInput.value = '';
+    groupSizeInput.value = '';
+    hideError(errorMessage);
+    hideResult();
+  };
+
+  groupButton.onclick = async () => {
+    hideError(errorMessage);
+    hideResult();
+
+    const namesText = namesInput.value.trim();
+    const groupSizeText = groupSizeInput.value.trim();
+
+    if (!namesText) {
+      showError(errorMessage, 'Please enter at least one name.');
+      return;
+    }
+    const groupSize = parseInt(groupSizeText);
+    if (!groupSize || groupSize < 1) {
+      showError(errorMessage, 'Please enter a valid group size (positive integer).');
+      return;
+    }
+
+    const names = namesText.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+
+    try {
+      // Save names
+      let res = await fetch('http://localhost:3000/api/names', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ names })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to save names');
+      }
+
+      // Create groups
+      res = await fetch('http://localhost:3000/api/groups', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ groupSize })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to create groups');
+      }
+      const data = await res.json();
+
+      // Display groups
+      let text = '';
+      data.groups.forEach((g, i) => {
+        text += `Group ${i + 1}:\n${g.join(', ')}\n\n`;
+      });
+      showResult(text);
+
+    } catch (err) {
+      showError(errorMessage, err.message);
+    }
+  };
+
+  async function loadGroups() {
+    try {
+      const res = await fetch('http://localhost:3000/api/groups', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.groups.length) return;
+      let text = '';
+      data.groups.forEach((g, i) => {
+        text += `Group ${i + 1}:\n${g.join(', ')}\n\n`;
+      });
+      showResult(text);
+    } catch {
+      // ignore errors here
+    }
+  }
+</script>
+
+</body>
+</html>
+
