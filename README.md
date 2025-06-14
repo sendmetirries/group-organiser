@@ -31,7 +31,6 @@
 ### 🚀 Getting Started
 
 1. Clone the repo  
-   ```bash
-git clone https://github.com/sendmetirries/group-organiser
-   cd group-organizer
+   ```bash git clone https://github.com/sendmetirries/group-organiser
+2.cd group-organizer
 
